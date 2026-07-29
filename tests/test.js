@@ -11,7 +11,7 @@ function closeTo(actual, expected, tolerance, message) {
   );
 }
 
-assert.equal(calculator.version, "1.1.0");
+assert.equal(calculator.version, "1.1.1");
 assert.equal(calculator.randomValues.length, 200);
 assert.equal(calculator.randomValues[0], 0.9);
 assert.equal(calculator.randomValues[199], 1.099);
@@ -119,6 +119,17 @@ assert.deepEqual(einganaPageData, {
   noblePhantasmCardType: "buster",
   noblePhantasmMultiplier: 300
 });
+
+const basicOnlyPageData = calculator.extractServantDataFromGrids(
+  [einganaBasic],
+  "エインガナ - siroi_human"
+);
+assert.equal(basicOnlyPageData.servantName, "エインガナ");
+assert.equal(basicOnlyPageData.attack, 10215);
+assert.equal(basicOnlyPageData.attackerClass, "caster");
+assert.equal(basicOnlyPageData.attackBaseNp, null);
+assert.equal(basicOnlyPageData.starRate, null);
+assert.deepEqual(basicOnlyPageData.hitCounts, {});
 
 const oshichiBasic = [
   ["真名", "八百屋お七"],
