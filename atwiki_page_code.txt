@@ -1,3 +1,5 @@
 #javascript(){{
-<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_DamageCalculator_atwiki.js?v=1.1.1"></script>
+var fgoDamageCalculatorScript = document.createElement("script");
+fgoDamageCalculatorScript.src = "https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_DamageCalculator_atwiki.js?v=1.1.2";
+document.head.appendChild(fgoDamageCalculatorScript);
 }}
