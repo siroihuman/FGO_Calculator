@@ -1,4 +1,3 @@
-*FGO ダメージ・NP・スター計算機
-
-&html(<div id="fgo-damage-calculator"></div>)
-#include_js(https://cdn.jsdelivr.net/gh/siroihuman/FGO_Battle_Simulator@main/FGO_DamageCalculator_atwiki.js?v=1.0.0)
+#javascript(){{
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_DamageCalculator_atwiki.js?v=1.1.0"></script>
+}}
