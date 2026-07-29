@@ -33,7 +33,7 @@
 })(function () {
   "use strict";
 
-  const VERSION = "1.1.2";
+  const VERSION = "1.1.3";
   const ATTACK_CORRECTION = 0.23;
   const RANDOM_VALUES = Array.from({ length: 200 }, function (_, index) {
     return (900 + index) / 1000;
