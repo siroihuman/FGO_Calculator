@@ -9,7 +9,7 @@ atwiki の各サーヴァント個別ページへ、閉じた状態の計算機�
 - スター獲得期待値
 - スター獲得数の最小～最大
 
-## ver.1.1.3 の主な機能
+## ver.1.1.4 の主な機能
 
 `FGO_DamageCalculator_atwiki.js` を共通メニューから1回読み込ませると、サーヴァント個別ページを自動判定します。
 
@@ -51,7 +51,7 @@ ATKなどの自動入力後も、各入力欄は自由に編集できます。�
 https://github.com/siroihuman/FGO_Calculator
 ```
 
-ChatGPTから更新済みの場合は、GitHubのリポジトリを開き、`FGO_DamageCalculator_atwiki.js` の先頭付近が `const VERSION = "1.1.3";` になっていることを確認してください。
+ChatGPTから更新済みの場合は、GitHubのリポジトリを開き、`FGO_DamageCalculator_atwiki.js` の先頭付近が `const VERSION = "1.1.4";` になっていることを確認してください。
 
 自分でブラウザから更新する場合は、次の手順です。
 
@@ -77,7 +77,7 @@ include_js plugin Error : このプラグインで利用できない命令また
 
 `#include_js(...)` は削除し、管理者用の `#javascript` プラグインで外部ファイルを読み込んでください。
 
-また、`#javascript` の中へ外部の `<script>` タグを直接書く方式は使用しません。atwiki公式の利用例と同じ `document.write` を使い、計算機本体を読み込みます。
+また、`#javascript` の中へHTMLタグや外部の`<script>`タグを直接書く方式は使用しません。atwikiにコードの一部をHTMLとして誤認識されないよう、JavaScriptだけで計算機本体を読み込みます。
 
 ### おすすめ：共通メニューページへ1回だけ貼る
 
@@ -91,14 +91,31 @@ include_js plugin Error : このプラグインで利用できない命令また
 
 ```text
 #javascript(){{
-document.write("<span id='fgo-calculator-load-error' style='display:none;color:#b00020;font-weight:bold'>計算機ファイルを読み込めませんでした。</span>");
-document.write("<script src='https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_DamageCalculator_atwiki.js?v=1.1.3'><\/script>");
-setTimeout(function() {
-  var fgoLoadError = document.getElementById("fgo-calculator-load-error");
-  if (!window.FGODamageCalculator && fgoLoadError) {
-    fgoLoadError.style.display = "block";
-  }
-}, 3000);
+var fgoLoadStatus = document.createElement("p");
+fgoLoadStatus.id = "fgo-calculator-load-status";
+fgoLoadStatus.style.color = "#555";
+fgoLoadStatus.style.fontWeight = "bold";
+fgoLoadStatus.textContent = "FGO計算機を読み込んでいます…";
+document.body.appendChild(fgoLoadStatus);
+
+var fgoDamageCalculatorScript = document.createElement("script");
+fgoDamageCalculatorScript.src = "https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_DamageCalculator_atwiki.js?v=1.1.4";
+fgoDamageCalculatorScript.onload = function() {
+  fgoLoadStatus.textContent = "FGO計算機ファイルを読み込みました。表示を準備しています…";
+  setTimeout(function() {
+    if (document.getElementById("fgo-damage-calculator")) {
+      fgoLoadStatus.remove();
+    } else {
+      fgoLoadStatus.style.color = "#b00020";
+      fgoLoadStatus.textContent = "計算機ファイルは読み込めましたが、サーヴァント情報を認識できませんでした。";
+    }
+  }, 3500);
+};
+fgoDamageCalculatorScript.onerror = function() {
+  fgoLoadStatus.style.color = "#b00020";
+  fgoLoadStatus.textContent = "計算機ファイルを読み込めませんでした。";
+};
+document.head.appendChild(fgoDamageCalculatorScript);
 }}
 ```
 
@@ -130,8 +147,8 @@ GitHubの更新直後は、jsDelivrやブラウザのキャッシュにより古
 2. まだ変わらない場合は、URL末尾のバージョン番号を変更します。
 
 ```text
-変更前：?v=1.1.3
-変更後：?v=1.1.4
+変更前：?v=1.1.4
+変更後：?v=1.1.5
 ```
 
 番号はキャッシュを区別する目印です。JavaScript本体のバージョンと完全一致していなくても読み込みには影響しません。
@@ -172,6 +189,11 @@ GitHubの更新直後は、jsDelivrやブラウザのキャッシュにより古
 - [siroi_human - オリジナルサーヴァント＆エネミー](https://w.atwiki.jp/siroi_human/pages/54.html)
 
 ## 更新履歴
+
+### ver.1.1.4
+
+- atwikiが文字列内のHTMLタグを誤認識する問題を回避
+- 読み込み中、外部ファイルの読み込み失敗、サーヴァント情報の認識失敗をページ上へ表示
 
 ### ver.1.1.3
 
