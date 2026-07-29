@@ -11,7 +11,7 @@ function closeTo(actual, expected, tolerance, message) {
   );
 }
 
-assert.equal(calculator.version, "1.1.1");
+assert.equal(calculator.version, "1.1.2");
 assert.equal(calculator.randomValues.length, 200);
 assert.equal(calculator.randomValues[0], 0.9);
 assert.equal(calculator.randomValues[199], 1.099);
