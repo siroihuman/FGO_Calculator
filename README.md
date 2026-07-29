@@ -9,7 +9,7 @@ atwiki の各サーヴァント個別ページへ、閉じた状態の計算機�
 - スター獲得期待値
 - スター獲得数の最小～最大
 
-## ver.1.1.2 の主な機能
+## ver.1.1.3 の主な機能
 
 `FGO_DamageCalculator_atwiki.js` を共通メニューから1回読み込ませると、サーヴァント個別ページを自動判定します。
 
@@ -51,7 +51,7 @@ ATKなどの自動入力後も、各入力欄は自由に編集できます。�
 https://github.com/siroihuman/FGO_Calculator
 ```
 
-ChatGPTから更新済みの場合は、GitHubのリポジトリを開き、`FGO_DamageCalculator_atwiki.js` の先頭付近が `const VERSION = "1.1.2";` になっていることを確認してください。
+ChatGPTから更新済みの場合は、GitHubのリポジトリを開き、`FGO_DamageCalculator_atwiki.js` の先頭付近が `const VERSION = "1.1.3";` になっていることを確認してください。
 
 自分でブラウザから更新する場合は、次の手順です。
 
@@ -77,7 +77,7 @@ include_js plugin Error : このプラグインで利用できない命令また
 
 `#include_js(...)` は削除し、管理者用の `#javascript` プラグインで外部ファイルを読み込んでください。
 
-また、`#javascript` の中へ外部の `<script>` タグを直接書く方式は使用しません。atwikiには短いJavaScriptだけを実行させ、そのJavaScriptから計算機本体を読み込みます。
+また、`#javascript` の中へ外部の `<script>` タグを直接書く方式は使用しません。atwiki公式の利用例と同じ `document.write` を使い、計算機本体を読み込みます。
 
 ### おすすめ：共通メニューページへ1回だけ貼る
 
@@ -86,14 +86,19 @@ include_js plugin Error : このプラグインで利用できない命令また
 3. 編集モードが「PukiWikiライクモード」であることを確認します。
 4. ページの編集権限を「管理者のみ」にし、JavaScriptを置ける管理者用ページにします。
 5. 古い `#include_js`、または `<script type="text/javascript" ...>` を含む古い `#javascript` ブロックがあれば、ブロック全体を削除します。
-6. 次の5行をメニュー本文の末尾へ貼り付けます。
+6. `atwiki_page_code.txt` の内容をメニュー本文の末尾へ貼り付けます。
 7. 保存し、サーヴァント個別ページを開き直します。
 
 ```text
 #javascript(){{
-var fgoDamageCalculatorScript = document.createElement("script");
-fgoDamageCalculatorScript.src = "https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_DamageCalculator_atwiki.js?v=1.1.2";
-document.head.appendChild(fgoDamageCalculatorScript);
+document.write("<span id='fgo-calculator-load-error' style='display:none;color:#b00020;font-weight:bold'>計算機ファイルを読み込めませんでした。</span>");
+document.write("<script src='https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_DamageCalculator_atwiki.js?v=1.1.3'><\/script>");
+setTimeout(function() {
+  var fgoLoadError = document.getElementById("fgo-calculator-load-error");
+  if (!window.FGODamageCalculator && fgoLoadError) {
+    fgoLoadError.style.display = "block";
+  }
+}, 3000);
 }}
 ```
 
@@ -101,7 +106,7 @@ document.head.appendChild(fgoDamageCalculatorScript);
 
 ### 個別ページだけで使用する場合
 
-共通メニューへ置かず、特定のサーヴァントページの末尾へ同じ5行を貼っても動作します。自動挿入される場所は、コードを貼った場所ではなく「保有スキル」の直前です。ただし、その個別ページも編集権限を「管理者のみ」にする必要があります。共通メニューと個別ページの両方へは貼らず、どちらか一方だけにしてください。
+共通メニューへ置かず、特定のサーヴァントページの末尾へ `atwiki_page_code.txt` と同じコードを貼っても動作します。自動挿入される場所は、コードを貼った場所ではなく「保有スキル」の直前です。ただし、その個別ページも編集権限を「管理者のみ」にする必要があります。共通メニューと個別ページの両方へは貼らず、どちらか一方だけにしてください。
 
 ### 表示確認
 
@@ -125,8 +130,8 @@ GitHubの更新直後は、jsDelivrやブラウザのキャッシュにより古
 2. まだ変わらない場合は、URL末尾のバージョン番号を変更します。
 
 ```text
-変更前：?v=1.1.2
-変更後：?v=1.1.3
+変更前：?v=1.1.3
+変更後：?v=1.1.4
 ```
 
 番号はキャッシュを区別する目印です。JavaScript本体のバージョンと完全一致していなくても読み込みには影響しません。
@@ -167,6 +172,11 @@ GitHubの更新直後は、jsDelivrやブラウザのキャッシュにより古
 - [siroi_human - オリジナルサーヴァント＆エネミー](https://w.atwiki.jp/siroi_human/pages/54.html)
 
 ## 更新履歴
+
+### ver.1.1.3
+
+- atwiki公式の利用例と同じ`document.write`を使う外部ファイル読み込み方式へ変更
+- 外部の計算機ファイルを読み込めなかった場合、赤字のエラーメッセージを表示
 
 ### ver.1.1.2
 
