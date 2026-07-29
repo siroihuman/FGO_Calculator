@@ -7,7 +7,7 @@ fgoLoadStatus.textContent = "FGO計算機を読み込んでいます…";
 document.body.appendChild(fgoLoadStatus);
 
 var fgoDamageCalculatorScript = document.createElement("script");
-fgoDamageCalculatorScript.src = "https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_DamageCalculator_atwiki.js?v=1.1.4";
+fgoDamageCalculatorScript.src = "https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_DamageCalculator_atwiki.js?v=1.1.5";
 fgoDamageCalculatorScript.onload = function() {
   fgoLoadStatus.textContent = "FGO計算機ファイルを読み込みました。表示を準備しています…";
   setTimeout(function() {
