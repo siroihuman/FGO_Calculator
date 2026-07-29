@@ -33,7 +33,7 @@
 })(function () {
   "use strict";
 
-  const VERSION = "1.1.4";
+  const VERSION = "1.1.5";
   const ATTACK_CORRECTION = 0.23;
   const RANDOM_VALUES = Array.from({ length: 200 }, function (_, index) {
     return (900 + index) / 1000;
@@ -624,6 +624,82 @@
     };
   }
 
+  function extractServantDataFromText(pageText, pageTitle) {
+    const text = normalizeText(pageText || "");
+    if (
+      text.indexOf("Class") === -1 ||
+      text.indexOf("Rare") === -1 ||
+      text.indexOf("ATK") === -1 ||
+      text.indexOf("保有スキル") === -1
+    ) {
+      return null;
+    }
+
+    const classMatch = text.match(/Class\s*([^\s|｜]+)/i);
+    const rarityMatch = text.match(/Rare\s*(\d+)/i);
+    const rarity = rarityMatch ? numberFromText(rarityMatch[1]) : null;
+    const naturalLevel = NATURAL_MAX_LEVEL_BY_RARITY[rarity] || null;
+    const atkMatch = text.match(
+      /ATK\s*((?:[\d,]+\s+){2,11}[\d,]+)/
+    );
+    const atkValues = atkMatch
+      ? (atkMatch[1].match(/[\d,]+/g) || []).map(numberFromText)
+      : [];
+    const naturalAtkIndex = {
+      1: 2,
+      2: 2,
+      3: 3,
+      4: 4,
+      5: 5
+    }[rarity];
+    const attack =
+      naturalAtkIndex !== undefined && atkValues[naturalAtkIndex] !== undefined
+        ? atkValues[naturalAtkIndex]
+        : atkValues.length
+          ? atkValues[atkValues.length - 1]
+          : null;
+
+    const starRateMatch = text.match(/スター発生率\s*([0-9]+(?:\.[0-9]+)?)/);
+    const attackBaseNpMatch = text.match(/N\/A\s*([0-9]+(?:\.[0-9]+)?)/i);
+    const hitMatch = text.match(
+      /ヒット数\s*Q\s*A\s*B\s*(?:EX|Ex)\s*宝具(?:\s*スター集中度\s*[0-9.]+)?\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)/
+    );
+    const noblePhantasmMatch = text.match(
+      /Card[\s\S]{0,500}?(Quick|Arts|Buster)[\s\S]{0,500}?(?:超強力な攻撃|強力な攻撃)[\s\S]{0,200}?(\d{3,4})/
+    );
+    const cardType = noblePhantasmMatch
+      ? cardIdFromRow([noblePhantasmMatch[1]])
+      : null;
+    const multiplier = noblePhantasmMatch
+      ? numberFromText(noblePhantasmMatch[2])
+      : null;
+
+    return {
+      servantName:
+        normalizeText(pageTitle).replace(/\s*[-|｜].*$/, "") ||
+        "サーヴァント",
+      rarity: rarity,
+      naturalLevel: naturalLevel,
+      attack: attack,
+      attackerClass: classIdFromText(classMatch ? classMatch[1] : ""),
+      attackBaseNp: attackBaseNpMatch
+        ? numberFromText(attackBaseNpMatch[1])
+        : null,
+      starRate: starRateMatch ? numberFromText(starRateMatch[1]) : null,
+      hitCounts: hitMatch
+        ? {
+            quick: numberFromText(hitMatch[1]),
+            arts: numberFromText(hitMatch[2]),
+            buster: numberFromText(hitMatch[3]),
+            extra: numberFromText(hitMatch[4]),
+            np: numberFromText(hitMatch[5])
+          }
+        : {},
+      noblePhantasmCardType: cardType,
+      noblePhantasmMultiplier: multiplier
+    };
+  }
+
   function extractServantPageData(sourceDocument) {
     if (!sourceDocument || !sourceDocument.querySelectorAll) {
       return null;
@@ -632,8 +708,16 @@
     const grids = Array.from(sourceDocument.querySelectorAll("table")).map(
       tableToGrid
     );
-    return extractServantDataFromGrids(
+    const fromGrids = extractServantDataFromGrids(
       grids,
+      sourceDocument.title || ""
+    );
+    if (fromGrids) {
+      return fromGrids;
+    }
+
+    return extractServantDataFromText(
+      sourceDocument.body ? sourceDocument.body.textContent : "",
       sourceDocument.title || ""
     );
   }
@@ -2687,6 +2771,7 @@
     calculateDamage: calculateDamage,
     tableToGrid: tableToGrid,
     extractServantDataFromGrids: extractServantDataFromGrids,
+    extractServantDataFromText: extractServantDataFromText,
     extractServantPageData: extractServantPageData,
     mount: mount,
     autoMount: autoMount
