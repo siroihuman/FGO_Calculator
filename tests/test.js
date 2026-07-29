@@ -11,7 +11,38 @@ function closeTo(actual, expected, tolerance, message) {
   );
 }
 
-assert.equal(calculator.version, "1.1.4");
+assert.equal(calculator.version, "1.1.5");
+
+const atwikiTextFallback = calculator.extractServantDataFromText(
+  [
+    "エインガナ",
+    "Class キャスター Rare 5 Cost 16",
+    "Quick Arts Buster HP 2320 9650 11232 12656 14238 15820 17332 20369",
+    "1 2 2 ATK 1578 6231 7252 8172 9193 10215 11182 13125",
+    "スター発生率 11.3",
+    "ヒット数 Q A B EX 宝具 スター集中度 51 3 3 3 6 3",
+    "N/A 0.62 N/D 3.00",
+    "Card Buster EX 結界宝具 敵全体に強力な攻撃 300 400 450 475 500",
+    "保有スキル"
+  ].join(" "),
+  "エインガナ - siroi_human - atwiki"
+);
+assert.ok(atwikiTextFallback);
+assert.equal(atwikiTextFallback.servantName, "エインガナ");
+assert.equal(atwikiTextFallback.rarity, 5);
+assert.equal(atwikiTextFallback.attack, 10215);
+assert.equal(atwikiTextFallback.attackerClass, "caster");
+assert.equal(atwikiTextFallback.attackBaseNp, 0.62);
+assert.equal(atwikiTextFallback.starRate, 11.3);
+assert.deepEqual(atwikiTextFallback.hitCounts, {
+  quick: 3,
+  arts: 3,
+  buster: 3,
+  extra: 6,
+  np: 3
+});
+assert.equal(atwikiTextFallback.noblePhantasmCardType, "buster");
+assert.equal(atwikiTextFallback.noblePhantasmMultiplier, 300);
 assert.equal(calculator.randomValues.length, 200);
 assert.equal(calculator.randomValues[0], 0.9);
 assert.equal(calculator.randomValues[199], 1.099);
