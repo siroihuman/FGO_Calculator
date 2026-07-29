@@ -11,7 +11,7 @@
     window.FGODamageCalculator = api;
 
     const start = function () {
-      api.mount("fgo-damage-calculator");
+      api.autoMount();
     };
 
     if (document.readyState === "loading") {
@@ -23,7 +23,7 @@
 })(function () {
   "use strict";
 
-  const VERSION = "1.0.0";
+  const VERSION = "1.1.0";
   const ATTACK_CORRECTION = 0.23;
   const RANDOM_VALUES = Array.from({ length: 200 }, function (_, index) {
     return (900 + index) / 1000;
@@ -177,6 +177,454 @@
     enemyStarGenerationUp: 0,
     enemyStarGenerationDown: 0
   };
+
+  const NATURAL_MAX_LEVEL_BY_RARITY = {
+    1: 60,
+    2: 65,
+    3: 70,
+    4: 80,
+    5: 90
+  };
+
+  const CLASS_NAME_TO_ID = {
+    セイバー: "saber",
+    アーチャー: "archer",
+    ランサー: "lancer",
+    ライダー: "rider",
+    キャスター: "caster",
+    アサシン: "assassin",
+    バーサーカー: "berserker",
+    シールダー: "shielder",
+    ルーラー: "ruler",
+    アヴェンジャー: "avenger",
+    ムーンキャンサー: "moonCancer",
+    アルターエゴ: "alterEgo",
+    フォーリナー: "foreigner",
+    プリテンダー: "pretender",
+    ビースト: "beast",
+    saber: "saber",
+    archer: "archer",
+    lancer: "lancer",
+    rider: "rider",
+    caster: "caster",
+    assassin: "assassin",
+    berserker: "berserker",
+    shielder: "shielder",
+    ruler: "ruler",
+    avenger: "avenger",
+    mooncancer: "moonCancer",
+    alterego: "alterEgo",
+    foreigner: "foreigner",
+    pretender: "pretender",
+    beast: "beast"
+  };
+
+  function normalizeFullWidth(value) {
+    return String(value == null ? "" : value)
+      .replace(/[０-９Ａ-Ｚａ-ｚ]/g, function (character) {
+        return String.fromCharCode(character.charCodeAt(0) - 65248);
+      })
+      .replace(/．/g, ".")
+      .replace(/，/g, ",")
+      .replace(/％/g, "%");
+  }
+
+  function normalizeText(value) {
+    return normalizeFullWidth(value)
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t\r\n\u3000]+/g, " ")
+      .trim();
+  }
+
+  function compactText(value) {
+    return normalizeText(value).replace(/\s+/g, "");
+  }
+
+  function numberFromText(value) {
+    const match = normalizeFullWidth(value)
+      .replace(/,/g, "")
+      .match(/-?\d+(?:\.\d+)?/);
+    if (!match) {
+      return null;
+    }
+    const number = Number(match[0]);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function isUsableNumber(value) {
+    return value !== null && value !== "" && Number.isFinite(Number(value));
+  }
+
+  function tableToGrid(table) {
+    if (!table || !table.rows) {
+      return [];
+    }
+
+    const grid = [];
+    Array.from(table.rows).forEach(function (row, rowIndex) {
+      if (!grid[rowIndex]) {
+        grid[rowIndex] = [];
+      }
+
+      let columnIndex = 0;
+      Array.from(row.cells || []).forEach(function (cell) {
+        while (grid[rowIndex][columnIndex] !== undefined) {
+          columnIndex += 1;
+        }
+
+        const text = normalizeText(cell.textContent || "");
+        const rowSpan = Math.max(
+          1,
+          parseInt(
+            cell.rowSpan ||
+              (cell.getAttribute && cell.getAttribute("rowspan")) ||
+              1,
+            10
+          ) || 1
+        );
+        const columnSpan = Math.max(
+          1,
+          parseInt(
+            cell.colSpan ||
+              (cell.getAttribute && cell.getAttribute("colspan")) ||
+              1,
+            10
+          ) || 1
+        );
+
+        for (let rowOffset = 0; rowOffset < rowSpan; rowOffset += 1) {
+          const targetRow = rowIndex + rowOffset;
+          if (!grid[targetRow]) {
+            grid[targetRow] = [];
+          }
+          for (
+            let columnOffset = 0;
+            columnOffset < columnSpan;
+            columnOffset += 1
+          ) {
+            const targetColumn = columnIndex + columnOffset;
+            if (grid[targetRow][targetColumn] === undefined) {
+              grid[targetRow][targetColumn] = text;
+            }
+          }
+        }
+
+        columnIndex += columnSpan;
+      });
+    });
+
+    return grid.map(function (row) {
+      return row.map(function (cell) {
+        return cell === undefined ? "" : cell;
+      });
+    });
+  }
+
+  function gridContains(grid, text) {
+    const target = compactText(text).toLowerCase();
+    return grid.some(function (row) {
+      return row.some(function (cell) {
+        return compactText(cell).toLowerCase().indexOf(target) !== -1;
+      });
+    });
+  }
+
+  function labelMatches(value, label) {
+    const text = compactText(value).toLowerCase();
+    const target = compactText(label).toLowerCase();
+    return text === target || text.indexOf(target) === 0;
+  }
+
+  function valueAfterLabel(grid, labels) {
+    const targets = Array.isArray(labels) ? labels : [labels];
+
+    for (let rowIndex = 0; rowIndex < grid.length; rowIndex += 1) {
+      const row = grid[rowIndex];
+      for (let columnIndex = 0; columnIndex < row.length; columnIndex += 1) {
+        const matched = targets.some(function (label) {
+          return labelMatches(row[columnIndex], label);
+        });
+        if (!matched) {
+          continue;
+        }
+
+        for (
+          let nextColumn = columnIndex + 1;
+          nextColumn < row.length;
+          nextColumn += 1
+        ) {
+          const candidate = normalizeText(row[nextColumn]);
+          if (!candidate) {
+            continue;
+          }
+          const repeatsLabel = targets.some(function (label) {
+            return labelMatches(candidate, label);
+          });
+          if (!repeatsLabel) {
+            return candidate;
+          }
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function classIdFromText(value) {
+    const text = compactText(value).toLowerCase();
+    const classNames = Object.keys(CLASS_NAME_TO_ID).sort(function (left, right) {
+      return right.length - left.length;
+    });
+
+    for (let index = 0; index < classNames.length; index += 1) {
+      const name = compactText(classNames[index]).toLowerCase();
+      if (text.indexOf(name) !== -1) {
+        return CLASS_NAME_TO_ID[classNames[index]];
+      }
+    }
+    return null;
+  }
+
+  function findAtkAtNaturalLevel(grid, rarity) {
+    const naturalLevel = NATURAL_MAX_LEVEL_BY_RARITY[rarity] || null;
+    const atkRow = grid.find(function (row) {
+      return row.some(function (cell) {
+        return compactText(cell).toUpperCase() === "ATK";
+      });
+    });
+
+    if (!atkRow) {
+      return { attack: null, naturalLevel: naturalLevel };
+    }
+
+    if (naturalLevel) {
+      const levelPattern = new RegExp("^Lv\\.?"+ naturalLevel + "$", "i");
+      for (let rowIndex = 0; rowIndex < grid.length; rowIndex += 1) {
+        const headerRow = grid[rowIndex];
+        for (
+          let columnIndex = 0;
+          columnIndex < headerRow.length;
+          columnIndex += 1
+        ) {
+          if (!levelPattern.test(compactText(headerRow[columnIndex]))) {
+            continue;
+          }
+          const attack = numberFromText(atkRow[columnIndex]);
+          if (attack !== null) {
+            return { attack: attack, naturalLevel: naturalLevel };
+          }
+        }
+      }
+    }
+
+    let atkLabelColumn = -1;
+    atkRow.some(function (cell, columnIndex) {
+      if (compactText(cell).toUpperCase() === "ATK") {
+        atkLabelColumn = columnIndex;
+        return true;
+      }
+      return false;
+    });
+
+    const fallbackValues = atkRow
+      .slice(atkLabelColumn + 1)
+      .map(numberFromText)
+      .filter(function (value) {
+        return value !== null;
+      });
+
+    return {
+      attack: fallbackValues.length
+        ? fallbackValues[fallbackValues.length - 1]
+        : null,
+      naturalLevel: naturalLevel
+    };
+  }
+
+  function findHitCounts(grid) {
+    const hitCounts = {};
+    const cardLabels = {
+      Q: "quick",
+      QUICK: "quick",
+      A: "arts",
+      ARTS: "arts",
+      B: "buster",
+      BUSTER: "buster",
+      EX: "extra",
+      EXTRA: "extra",
+      宝具: "np"
+    };
+
+    for (let rowIndex = 0; rowIndex < grid.length; rowIndex += 1) {
+      const row = grid[rowIndex];
+      const compactRow = row.map(function (cell) {
+        return compactText(cell).toUpperCase();
+      });
+      const requiredLabels = ["Q", "A", "B", "EX"];
+      const hasCardHeader = requiredLabels.every(function (label) {
+        return compactRow.indexOf(label) !== -1;
+      });
+      if (!hasCardHeader) {
+        continue;
+      }
+
+      compactRow.forEach(function (label, columnIndex) {
+        const key = cardLabels[label];
+        if (!key) {
+          return;
+        }
+        for (
+          let valueRowIndex = rowIndex + 1;
+          valueRowIndex < Math.min(grid.length, rowIndex + 4);
+          valueRowIndex += 1
+        ) {
+          const value = numberFromText(grid[valueRowIndex][columnIndex]);
+          if (value !== null && value >= 1 && value <= 99) {
+            hitCounts[key] = Math.round(value);
+            break;
+          }
+        }
+      });
+
+      if (Object.keys(hitCounts).length) {
+        break;
+      }
+    }
+
+    return hitCounts;
+  }
+
+  function cardIdFromRow(row) {
+    const cardNames = {
+      quick: "quick",
+      arts: "arts",
+      buster: "buster"
+    };
+
+    for (let index = 0; index < row.length; index += 1) {
+      const text = compactText(row[index]).toLowerCase();
+      if (cardNames[text]) {
+        return cardNames[text];
+      }
+    }
+    return null;
+  }
+
+  function findNoblePhantasmData(grids) {
+    let detected = null;
+
+    grids.forEach(function (grid) {
+      if (!gridContains(grid, "Card") || !gridContains(grid, "効果")) {
+        return;
+      }
+
+      let effectColumn = -1;
+      grid.some(function (row) {
+        return row.some(function (cell, columnIndex) {
+          if (compactText(cell) === "効果") {
+            effectColumn = columnIndex;
+            return true;
+          }
+          return false;
+        });
+      });
+
+      grid.forEach(function (row) {
+        const effectText = compactText(row.join(" "));
+        if (
+          effectText.indexOf("強力な攻撃") === -1 &&
+          effectText.indexOf("超強力な攻撃") === -1
+        ) {
+          return;
+        }
+
+        const cardType = cardIdFromRow(row);
+        let multiplier = null;
+        const searchStart = Math.max(0, effectColumn + 1);
+        for (let index = searchStart; index < row.length; index += 1) {
+          const value = numberFromText(row[index]);
+          if (value !== null && value >= 100) {
+            multiplier = value;
+            break;
+          }
+        }
+
+        if (cardType || multiplier !== null) {
+          detected = {
+            cardType: cardType,
+            multiplier: multiplier
+          };
+        }
+      });
+    });
+
+    return detected;
+  }
+
+  function extractServantDataFromGrids(grids, pageTitle) {
+    const basicGrid = grids.find(function (grid) {
+      return (
+        gridContains(grid, "Class") &&
+        gridContains(grid, "Rare") &&
+        gridContains(grid, "ATK")
+      );
+    });
+    const hiddenGrid = grids.find(function (grid) {
+      return (
+        gridContains(grid, "ヒット数") &&
+        gridContains(grid, "スター発生率") &&
+        gridContains(grid, "N/A")
+      );
+    });
+
+    if (!basicGrid || !hiddenGrid) {
+      return null;
+    }
+
+    const rarity = numberFromText(valueAfterLabel(basicGrid, "Rare"));
+    const atk = findAtkAtNaturalLevel(basicGrid, rarity);
+    const noblePhantasm = findNoblePhantasmData(grids);
+    const servantName =
+      valueAfterLabel(basicGrid, "真名") ||
+      normalizeText(pageTitle).replace(/\s*[-|｜].*$/, "");
+    const starRate = numberFromText(
+      valueAfterLabel(hiddenGrid, "スター発生率")
+    );
+    const attackBaseNp = numberFromText(valueAfterLabel(hiddenGrid, "N/A"));
+
+    return {
+      servantName: servantName || "サーヴァント",
+      rarity: rarity,
+      naturalLevel: atk.naturalLevel,
+      attack: atk.attack,
+      attackerClass: classIdFromText(
+        valueAfterLabel(basicGrid, ["Class", "クラス"])
+      ),
+      attackBaseNp: attackBaseNp,
+      starRate: starRate,
+      hitCounts: findHitCounts(hiddenGrid),
+      noblePhantasmCardType: noblePhantasm
+        ? noblePhantasm.cardType
+        : null,
+      noblePhantasmMultiplier: noblePhantasm
+        ? noblePhantasm.multiplier
+        : null
+    };
+  }
+
+  function extractServantPageData(sourceDocument) {
+    if (!sourceDocument || !sourceDocument.querySelectorAll) {
+      return null;
+    }
+
+    const grids = Array.from(sourceDocument.querySelectorAll("table")).map(
+      tableToGrid
+    );
+    return extractServantDataFromGrids(
+      grids,
+      sourceDocument.title || ""
+    );
+  }
 
   function toFiniteNumber(value, fallback) {
     const number = Number(value);
@@ -901,7 +1349,7 @@
       '<header class="fdc-header">' +
       "<div>" +
       '<p class="fdc-kicker">Fate/Grand Order</p>' +
-      '<h2 class="fdc-title">ダメージ計算機</h2>' +
+      '<h2 class="fdc-title">ダメージ・NP・スター計算機</h2>' +
       '<p class="fdc-lead">通常攻撃・宝具の全Hit合計ダメージを計算します。数値欄の「30」は30％を意味します。</p>' +
       "</div>" +
       '<span class="fdc-version">ver.' +
@@ -910,6 +1358,8 @@
       "</header>" +
       '<div class="fdc-toolbar">' +
       '<button type="button" class="fdc-button fdc-button-secondary" data-action="reset">入力を初期化</button>' +
+      '<button type="button" class="fdc-button fdc-button-secondary" data-action="autofill">ページ情報を再入力</button>' +
+      '<span class="fdc-page-state" data-role="page-state">ページ情報を確認しています</span>' +
       '<span class="fdc-save-state" data-role="save-state">入力は自動保存されます</span>' +
       "</div>" +
       '<div class="fdc-main-grid">' +
@@ -930,7 +1380,7 @@
         value: DEFAULTS.attack,
         min: 0,
         step: 1,
-        note: "概念礼装・フォウ・各種スコア反映後"
+        note: "自然上限LvのATKを自動入力。礼装・フォウ等を加えて編集できます"
       }) +
       '<label class="fdc-field">' +
       '<span class="fdc-label">攻撃側クラス</span>' +
@@ -1459,6 +1909,10 @@
     const style = document.createElement("style");
     style.id = "fgo-damage-calculator-style";
     style.textContent =
+      "#fgo-damage-calculator-panel{margin:18px 0;border:1px solid #9fb4c8;border-radius:10px;background:#eef4fa;box-shadow:0 3px 12px rgba(27,57,91,.09);overflow:hidden}" +
+      "#fgo-damage-calculator-panel>summary{padding:13px 16px;color:#214a70;font-weight:700;cursor:pointer;background:linear-gradient(180deg,#f7fbff,#e5eef7)}" +
+      "#fgo-damage-calculator-panel[open]>summary{border-bottom:1px solid #b8c9d9}" +
+      "#fgo-damage-calculator-panel>#fgo-damage-calculator{margin:14px}" +
       "#fgo-damage-calculator{--fdc-ink:#172335;--fdc-muted:#5c6b7d;--fdc-line:#cbd7e5;--fdc-soft:#eef4fa;--fdc-panel:#fff;--fdc-blue:#245f9e;--fdc-blue-dark:#174774;--fdc-gold:#b9862e;max-width:1180px;margin:18px auto;color:var(--fdc-ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans JP',Meiryo,sans-serif;line-height:1.55}" +
       "#fgo-damage-calculator *{box-sizing:border-box}" +
       "#fgo-damage-calculator .fdc-shell{background:linear-gradient(180deg,#f8fbfe 0,#edf3f9 100%);border:1px solid #adc1d5;border-radius:14px;box-shadow:0 8px 28px rgba(27,57,91,.12);overflow:hidden}" +
@@ -1467,14 +1921,16 @@
       "#fgo-damage-calculator .fdc-title{margin:0;font-size:25px;line-height:1.3;color:#fff;border:0;padding:0}" +
       "#fgo-damage-calculator .fdc-lead{margin:6px 0 0;font-size:13px;opacity:.9}" +
       "#fgo-damage-calculator .fdc-version{flex:0 0 auto;margin-top:3px;padding:4px 9px;border:1px solid rgba(255,255,255,.35);border-radius:999px;font-size:11px;background:rgba(255,255,255,.1)}" +
-      "#fgo-damage-calculator .fdc-toolbar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#e2ebf4;border-bottom:1px solid var(--fdc-line)}" +
+      "#fgo-damage-calculator .fdc-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:9px 12px;padding:10px 16px;background:#e2ebf4;border-bottom:1px solid var(--fdc-line)}" +
       "#fgo-damage-calculator .fdc-button{appearance:none;border:1px solid transparent;border-radius:7px;padding:8px 13px;font:inherit;font-size:13px;font-weight:700;line-height:1.2;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}" +
       "#fgo-damage-calculator .fdc-button:active{transform:translateY(1px)}" +
+      "#fgo-damage-calculator .fdc-button:disabled{opacity:.5;cursor:not-allowed;transform:none}" +
       "#fgo-damage-calculator .fdc-button:focus-visible,#fgo-damage-calculator input:focus-visible,#fgo-damage-calculator select:focus-visible,#fgo-damage-calculator summary:focus-visible{outline:3px solid rgba(54,128,200,.3);outline-offset:1px}" +
       "#fgo-damage-calculator .fdc-button-secondary{border-color:#9db1c5;background:#fff;color:#334b64}" +
       "#fgo-damage-calculator .fdc-button-secondary:hover{background:#f5f9fd}" +
       "#fgo-damage-calculator .fdc-button-primary{background:var(--fdc-blue);color:#fff;border-color:var(--fdc-blue-dark)}" +
       "#fgo-damage-calculator .fdc-button-primary:hover{background:var(--fdc-blue-dark)}" +
+      "#fgo-damage-calculator .fdc-page-state{flex:1 1 300px;color:#315873;font-size:12px;font-weight:600}" +
       "#fgo-damage-calculator .fdc-save-state{font-size:12px;color:var(--fdc-muted)}" +
       "#fgo-damage-calculator .fdc-main-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.72fr);gap:16px;padding:16px}" +
       "#fgo-damage-calculator .fdc-form{min-width:0}" +
@@ -1531,7 +1987,7 @@
       "#fgo-damage-calculator .fdc-footer{padding:10px 16px;border-top:1px solid var(--fdc-line);background:#dfe8f1;color:#667687;font-size:10px;text-align:center}" +
       "#fgo-damage-calculator [hidden]{display:none!important}" +
       "@media(max-width:860px){#fgo-damage-calculator .fdc-main-grid{grid-template-columns:1fr}#fgo-damage-calculator .fdc-result-panel{grid-row:1}#fgo-damage-calculator .fdc-result-sticky{position:static}}" +
-      "@media(max-width:620px){#fgo-damage-calculator{margin:10px auto}#fgo-damage-calculator .fdc-shell{border-radius:9px}#fgo-damage-calculator .fdc-header{padding:16px}#fgo-damage-calculator .fdc-title{font-size:21px}#fgo-damage-calculator .fdc-main-grid{padding:10px;gap:10px}#fgo-damage-calculator .fdc-section{padding:12px}#fgo-damage-calculator .fdc-grid-2,#fgo-damage-calculator .fdc-grid-3{grid-template-columns:1fr}#fgo-damage-calculator .fdc-result-cards strong{font-size:14px}#fgo-damage-calculator .fdc-reference-result strong{font-size:27px}#fgo-damage-calculator .fdc-resource-results{grid-template-columns:1fr 1fr}#fgo-damage-calculator .fdc-toolbar{align-items:flex-start;flex-direction:column}}" +
+      "@media(max-width:620px){#fgo-damage-calculator-panel>#fgo-damage-calculator{margin:8px}#fgo-damage-calculator{margin:10px auto}#fgo-damage-calculator .fdc-shell{border-radius:9px}#fgo-damage-calculator .fdc-header{padding:16px}#fgo-damage-calculator .fdc-title{font-size:21px}#fgo-damage-calculator .fdc-main-grid{padding:10px;gap:10px}#fgo-damage-calculator .fdc-section{padding:12px}#fgo-damage-calculator .fdc-grid-2,#fgo-damage-calculator .fdc-grid-3{grid-template-columns:1fr}#fgo-damage-calculator .fdc-result-cards strong{font-size:14px}#fgo-damage-calculator .fdc-reference-result strong{font-size:27px}#fgo-damage-calculator .fdc-resource-results{grid-template-columns:1fr 1fr}#fgo-damage-calculator .fdc-toolbar{align-items:stretch;flex-direction:column}#fgo-damage-calculator .fdc-page-state{flex-basis:auto}}" +
       "@media(prefers-reduced-motion:reduce){#fgo-damage-calculator .fdc-button{transition:none}}";
     document.head.appendChild(style);
   }
@@ -1597,6 +2053,99 @@
     });
   }
 
+  function pageAttackState(pageData, currentState, options) {
+    if (!pageData) {
+      return {};
+    }
+
+    const settings = options || {};
+    const state = currentState || DEFAULTS;
+    const pageState = {};
+    const attackType = state.attackType === "np" ? "np" : "normal";
+    let cardType = CARD_DATA[state.cardType] ? state.cardType : "buster";
+
+    if (
+      attackType === "np" &&
+      settings.forceNoblePhantasmCard &&
+      pageData.noblePhantasmCardType
+    ) {
+      cardType = pageData.noblePhantasmCardType;
+      pageState.cardType = cardType;
+    }
+
+    const hitKey = attackType === "np" ? "np" : cardType;
+    if (
+      pageData.hitCounts &&
+      isUsableNumber(pageData.hitCounts[hitKey])
+    ) {
+      pageState.hitCount = Number(pageData.hitCounts[hitKey]);
+    }
+
+    if (
+      attackType === "np" &&
+      isUsableNumber(pageData.noblePhantasmMultiplier)
+    ) {
+      pageState.noblePhantasmMultiplier = Number(
+        pageData.noblePhantasmMultiplier
+      );
+    }
+
+    return pageState;
+  }
+
+  function pageDataToState(pageData, currentState, options) {
+    if (!pageData) {
+      return {};
+    }
+
+    const pageState = pageAttackState(pageData, currentState, options);
+    if (isUsableNumber(pageData.attack)) {
+      pageState.attack = Number(pageData.attack);
+    }
+    if (pageData.attackerClass && CLASS_DATA[pageData.attackerClass]) {
+      pageState.attackerClass = pageData.attackerClass;
+    }
+    if (isUsableNumber(pageData.attackBaseNp)) {
+      pageState.attackBaseNp = Number(pageData.attackBaseNp);
+    }
+    if (isUsableNumber(pageData.starRate)) {
+      pageState.starRate = Number(pageData.starRate);
+    }
+    if (isUsableNumber(pageData.noblePhantasmMultiplier)) {
+      pageState.noblePhantasmMultiplier = Number(
+        pageData.noblePhantasmMultiplier
+      );
+    }
+
+    return pageState;
+  }
+
+  function pageDataSummary(pageData) {
+    if (!pageData) {
+      return "ページ情報：未検出（各項目を手動入力できます）";
+    }
+
+    const parts = [pageData.servantName || "サーヴァント"];
+    if (
+      isUsableNumber(pageData.attack) &&
+      isUsableNumber(pageData.naturalLevel)
+    ) {
+      parts.push(
+        "Lv." +
+          pageData.naturalLevel +
+          " ATK " +
+          formatInteger(pageData.attack)
+      );
+    }
+    if (isUsableNumber(pageData.attackBaseNp)) {
+      parts.push("N/A " + pageData.attackBaseNp);
+    }
+    if (isUsableNumber(pageData.starRate)) {
+      parts.push("SR " + pageData.starRate + "%");
+    }
+    return "ページ情報：" + parts.join(" / ");
+  }
+
   function storageKey() {
     if (typeof location === "undefined") {
       return "fgo-damage-calculator:" + VERSION;
@@ -1605,7 +2154,7 @@
       "fgo-damage-calculator:" +
       location.origin +
       location.pathname +
-      ":v1"
+      ":v2"
     );
   }
 
@@ -1888,22 +2437,88 @@
     ].join("\n");
   }
 
-  function mount(targetId) {
+  function findAutoInsertionAnchor(sourceDocument) {
+    const headings = Array.from(sourceDocument.querySelectorAll("h2"));
+    const preferredHeadings = ["性能", "プロフィール"];
+
+    for (
+      let preferredIndex = 0;
+      preferredIndex < preferredHeadings.length;
+      preferredIndex += 1
+    ) {
+      const preferred = preferredHeadings[preferredIndex];
+      const heading = headings.find(function (candidate) {
+        const text = compactText(candidate.textContent);
+        return text === preferred || text.indexOf(preferred) === 0;
+      });
+      if (heading) {
+        return heading;
+      }
+    }
+
+    return null;
+  }
+
+  function createAutoPanel(sourceDocument, pageData) {
+    const anchor = findAutoInsertionAnchor(sourceDocument);
+    if (!anchor || !anchor.parentNode) {
+      return null;
+    }
+
+    const panel = sourceDocument.createElement("details");
+    panel.id = "fgo-damage-calculator-panel";
+
+    const summary = sourceDocument.createElement("summary");
+    summary.textContent =
+      (pageData.servantName || "サーヴァント") +
+      "：ダメージ・NP・スター計算機（ページ情報を自動入力）";
+
+    const root = sourceDocument.createElement("div");
+    root.id = "fgo-damage-calculator";
+
+    panel.appendChild(summary);
+    panel.appendChild(root);
+    anchor.parentNode.insertBefore(panel, anchor);
+    return root;
+  }
+
+  function mount(targetId, options) {
     if (typeof document === "undefined") {
       return null;
     }
 
+    const settings = options || {};
     const root = document.getElementById(targetId || "fgo-damage-calculator");
     if (!root || root.getAttribute("data-fdc-mounted") === "true") {
       return root || null;
     }
 
+    const pageData = Object.prototype.hasOwnProperty.call(settings, "pageData")
+      ? settings.pageData
+      : extractServantPageData(document);
+
     injectStyles();
     root.setAttribute("data-fdc-mounted", "true");
     root.innerHTML = createMarkup();
+    root.__fdcPageData = pageData;
 
     const form = root.querySelector(".fdc-form");
+    applyStoredState(
+      root,
+      pageDataToState(pageData, DEFAULTS, {
+        forceNoblePhantasmCard: false
+      })
+    );
     applyStoredState(root, loadState());
+    setText(root, "page-state", pageDataSummary(pageData));
+
+    const autofillButton = root.querySelector('[data-action="autofill"]');
+    if (autofillButton) {
+      autofillButton.disabled = !pageData;
+      autofillButton.title = pageData
+        ? "ATK・クラス・N/A・SR・Hit数・宝具情報をページ表から再取得します"
+        : "このページではサーヴァント情報を検出できませんでした";
+    }
     syncAvailability(root);
 
     let saveTimer = 0;
@@ -1934,7 +2549,22 @@
     form.addEventListener("input", function () {
       update();
     });
-    form.addEventListener("change", function () {
+    form.addEventListener("change", function (event) {
+      const changedKey =
+        event.target && event.target.getAttribute
+          ? event.target.getAttribute("data-key")
+          : "";
+      if (
+        pageData &&
+        (changedKey === "attackType" || changedKey === "cardType")
+      ) {
+        applyStoredState(
+          root,
+          pageAttackState(pageData, readForm(root), {
+            forceNoblePhantasmCard: changedKey === "attackType"
+          })
+        );
+      }
       update();
     });
 
@@ -1942,13 +2572,42 @@
     resetButton.addEventListener("click", function () {
       clearState();
       form.reset();
+      applyStoredState(
+        root,
+        pageDataToState(pageData, DEFAULTS, {
+          forceNoblePhantasmCard: false
+        })
+      );
       syncAvailability(root);
       update({ save: false });
-      setText(root, "save-state", "入力を初期化しました");
+      setText(
+        root,
+        "save-state",
+        pageData
+          ? "ページの基本情報へ戻しました"
+          : "入力を初期化しました"
+      );
       setTimeout(function () {
         setText(root, "save-state", "入力は自動保存されます");
       }, 1600);
     });
+
+    if (autofillButton && pageData) {
+      autofillButton.addEventListener("click", function () {
+        applyStoredState(
+          root,
+          pageDataToState(pageData, readForm(root), {
+            forceNoblePhantasmCard: true
+          })
+        );
+        update();
+        setText(root, "page-state", pageDataSummary(pageData));
+        setText(root, "save-state", "ページ情報を再入力しました");
+        setTimeout(function () {
+          setText(root, "save-state", "入力は自動保存されます");
+        }, 1600);
+      });
+    }
 
     const copyButton = root.querySelector('[data-action="copy"]');
     copyButton.addEventListener("click", function () {
@@ -1978,6 +2637,27 @@
     return root;
   }
 
+  function autoMount() {
+    if (typeof document === "undefined") {
+      return null;
+    }
+
+    const existingRoot = document.getElementById("fgo-damage-calculator");
+    if (existingRoot) {
+      return mount("fgo-damage-calculator");
+    }
+
+    const pageData = extractServantPageData(document);
+    if (!pageData) {
+      return null;
+    }
+
+    const root = createAutoPanel(document, pageData);
+    return root
+      ? mount("fgo-damage-calculator", { pageData: pageData })
+      : null;
+  }
+
   return {
     version: VERSION,
     defaults: Object.assign({}, DEFAULTS),
@@ -1991,6 +2671,10 @@
     getDtdr: getDtdr,
     getDsr: getDsr,
     calculateDamage: calculateDamage,
-    mount: mount
+    tableToGrid: tableToGrid,
+    extractServantDataFromGrids: extractServantDataFromGrids,
+    extractServantPageData: extractServantPageData,
+    mount: mount,
+    autoMount: autoMount
   };
 });
