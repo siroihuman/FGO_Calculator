@@ -9,7 +9,7 @@ atwiki の各サーヴァント個別ページへ、閉じた状態の計算機�
 - スター獲得期待値
 - スター獲得数の最小～最大
 
-## ver.1.1.4 の主な機能
+## ver.1.1.5 の主な機能
 
 `FGO_DamageCalculator_atwiki.js` を共通メニューから1回読み込ませると、サーヴァント個別ページを自動判定します。
 
@@ -51,7 +51,7 @@ ATKなどの自動入力後も、各入力欄は自由に編集できます。�
 https://github.com/siroihuman/FGO_Calculator
 ```
 
-ChatGPTから更新済みの場合は、GitHubのリポジトリを開き、`FGO_DamageCalculator_atwiki.js` の先頭付近が `const VERSION = "1.1.4";` になっていることを確認してください。
+ChatGPTから更新済みの場合は、GitHubのリポジトリを開き、`FGO_DamageCalculator_atwiki.js` の先頭付近が `const VERSION = "1.1.5";` になっていることを確認してください。
 
 自分でブラウザから更新する場合は、次の手順です。
 
@@ -99,7 +99,7 @@ fgoLoadStatus.textContent = "FGO計算機を読み込んでいます…";
 document.body.appendChild(fgoLoadStatus);
 
 var fgoDamageCalculatorScript = document.createElement("script");
-fgoDamageCalculatorScript.src = "https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_DamageCalculator_atwiki.js?v=1.1.4";
+fgoDamageCalculatorScript.src = "https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_DamageCalculator_atwiki.js?v=1.1.5";
 fgoDamageCalculatorScript.onload = function() {
   fgoLoadStatus.textContent = "FGO計算機ファイルを読み込みました。表示を準備しています…";
   setTimeout(function() {
@@ -147,8 +147,8 @@ GitHubの更新直後は、jsDelivrやブラウザのキャッシュにより古
 2. まだ変わらない場合は、URL末尾のバージョン番号を変更します。
 
 ```text
-変更前：?v=1.1.4
-変更後：?v=1.1.5
+変更前：?v=1.1.5
+変更後：?v=1.1.6
 ```
 
 番号はキャッシュを区別する目印です。JavaScript本体のバージョンと完全一致していなくても読み込みには影響しません。
@@ -189,6 +189,11 @@ GitHubの更新直後は、jsDelivrやブラウザのキャッシュにより古
 - [siroi_human - オリジナルサーヴァント＆エネミー](https://w.atwiki.jp/siroi_human/pages/54.html)
 
 ## 更新履歴
+
+### ver.1.1.5
+
+- atwikiの表を通常のHTMLテーブルとして取得できない場合に、ページ本文から基本情報を読み取る予備処理を追加
+- Class、Rare、自然上限LvのATK、N/A、スター発生率、各カードHit数、宝具カード種類、宝具Lv.1倍率の本文解析に対応
 
 ### ver.1.1.4
 
