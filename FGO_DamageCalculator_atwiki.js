@@ -11,7 +11,17 @@
     window.FGODamageCalculator = api;
 
     const start = function () {
-      api.autoMount();
+      if (api.autoMount()) {
+        return;
+      }
+
+      [300, 1000, 2500].forEach(function (delay) {
+        setTimeout(function () {
+          if (!document.getElementById("fgo-damage-calculator")) {
+            api.autoMount();
+          }
+        }, delay);
+      });
     };
 
     if (document.readyState === "loading") {
@@ -23,7 +33,7 @@
 })(function () {
   "use strict";
 
-  const VERSION = "1.1.0";
+  const VERSION = "1.1.1";
   const ATTACK_CORRECTION = 0.23;
   const RANDOM_VALUES = Array.from({ length: 200 }, function (_, index) {
     return (900 + index) / 1000;
@@ -577,7 +587,7 @@
       );
     });
 
-    if (!basicGrid || !hiddenGrid) {
+    if (!basicGrid) {
       return null;
     }
 
@@ -587,10 +597,12 @@
     const servantName =
       valueAfterLabel(basicGrid, "真名") ||
       normalizeText(pageTitle).replace(/\s*[-|｜].*$/, "");
-    const starRate = numberFromText(
-      valueAfterLabel(hiddenGrid, "スター発生率")
-    );
-    const attackBaseNp = numberFromText(valueAfterLabel(hiddenGrid, "N/A"));
+    const starRate = hiddenGrid
+      ? numberFromText(valueAfterLabel(hiddenGrid, "スター発生率"))
+      : null;
+    const attackBaseNp = hiddenGrid
+      ? numberFromText(valueAfterLabel(hiddenGrid, "N/A"))
+      : null;
 
     return {
       servantName: servantName || "サーヴァント",
@@ -602,7 +614,7 @@
       ),
       attackBaseNp: attackBaseNp,
       starRate: starRate,
-      hitCounts: findHitCounts(hiddenGrid),
+      hitCounts: hiddenGrid ? findHitCounts(hiddenGrid) : {},
       noblePhantasmCardType: noblePhantasm
         ? noblePhantasm.cardType
         : null,
@@ -2438,8 +2450,10 @@
   }
 
   function findAutoInsertionAnchor(sourceDocument) {
-    const headings = Array.from(sourceDocument.querySelectorAll("h2"));
-    const preferredHeadings = ["性能", "プロフィール"];
+    const headings = Array.from(
+      sourceDocument.querySelectorAll("h1,h2,h3,h4,h5,h6")
+    );
+    const preferredHeadings = ["保有スキル", "性能", "プロフィール"];
 
     for (
       let preferredIndex = 0;
