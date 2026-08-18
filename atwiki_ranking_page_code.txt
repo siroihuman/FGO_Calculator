@@ -1,0 +1,14 @@
+#javascript(){{
+var fgoRankingRoot = document.createElement("div");
+fgoRankingRoot.id = "fgo-ranking-generator";
+
+var fgoRankingAnchor = document.querySelector("#wikibody, .wikibody, #contents, .contents, main") || document.body;
+fgoRankingAnchor.appendChild(fgoRankingRoot);
+
+var fgoRankingScript = document.createElement("script");
+fgoRankingScript.src = "https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_RankingGenerator_atwiki.js?v=1.0.0";
+fgoRankingScript.onerror = function() {
+  fgoRankingRoot.textContent = "ランキング生成ファイルを読み込めませんでした。";
+};
+document.head.appendChild(fgoRankingScript);
+}}
