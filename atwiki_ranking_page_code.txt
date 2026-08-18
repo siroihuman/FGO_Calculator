@@ -6,7 +6,7 @@ var fgoRankingAnchor = document.querySelector("#wikibody, .wikibody, #contents, 
 fgoRankingAnchor.appendChild(fgoRankingRoot);
 
 var fgoRankingScript = document.createElement("script");
-fgoRankingScript.src = "https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@main/FGO_RankingGenerator_atwiki.js?v=1.0.0";
+fgoRankingScript.src = "https://cdn.jsdelivr.net/gh/siroihuman/FGO_Calculator@53650ec0ad40a32c655ec3ff9bf91f4196cde4c0/FGO_RankingGenerator_atwiki.js";
 fgoRankingScript.onerror = function() {
   fgoRankingRoot.textContent = "ランキング生成ファイルを読み込めませんでした。";
 };
